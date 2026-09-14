@@ -1,0 +1,16 @@
+{
+  "sites": [
+    {
+      "name": "bok-monitor",
+      "src": "out/index.html",
+      "extraDirs": { "out/fig": "fig" },
+      "audits": ["node audit.js"],
+      "secretFiles": [".env", "../../국장 매크로 모니터/.env", "../../미장 요약/.env", "../.env"],
+      "repoDir": "C:/Users/rsm86/bok-monitor-pages",
+      "branch": "main",
+      "publicUrl": "https://rsm0kk.github.io/bok-monitor/",
+      "noindex": true,
+      "squash": true
+    }
+  ]
+}

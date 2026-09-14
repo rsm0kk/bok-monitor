@@ -1,0 +1,89 @@
+name: daily-dashboard
+
+# 국장 정책·수출 모니터 — 매일 자동 갱신 루틴 (PC 가 꺼져 있어도 GitHub 에서 돈다)
+#   00:30 UTC = 09:30 KST : 미국 전일 종가·FRED 야간 갱신 반영
+#   07:30 UTC = 16:30 KST : ECOS 당일치·컨센서스 스냅샷 (미국 발표 21:30 KST 보다 앞)
+#   13:00 UTC = 22:00 KST : 미국 지표 발표(21:30 KST) 직후 판정용
+# GitHub 예약 실행은 수~수십 분 늦을 수 있다.
+on:
+  schedule:
+    - cron: '30 0 * * *'
+    - cron: '30 7 * * *'
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-dashboard
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Python 의존성
+        run: pip install --quiet openpyxl
+
+      - name: 추출 (xlsx → out/data.json)
+        run: python extract.py
+        env:
+          PYTHONIOENCODING: utf-8
+
+      - name: ECOS 최신치
+        run: node fetch-ecos.js
+        env:
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+
+      - name: FRED 미국 매크로
+        run: node fetch-fred.js
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+
+      - name: 컨센서스 스냅샷·판정
+        run: node fetch-consensus.js
+
+      - name: 야후 당일치
+        run: node fetch-yahoo.js
+
+      - name: 빌드 (키 잔존 검사 포함)
+        run: node build.js
+        env:
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+
+      - name: 공개 가능 검사
+        run: node audit.js
+
+      - name: 캐시 커밋 (컨센서스 기록 누적용)
+        run: |
+          git config user.name "dashboard-bot"
+          git config user.email "dashboard-bot@users.noreply.github.com"
+          git add cache
+          if git diff --cached --quiet; then echo "캐시 변경 없음"; else git commit -q -m "cache: $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M') KST"; git push -q; fi
+
+      - name: GitHub Pages 배포 (gh-pages 브랜치, 커밋 1개 유지)
+        run: |
+          cd out
+          printf 'User-agent: *\nDisallow: /\n' > robots.txt
+          touch .nojekyll
+          grep -q 'name="robots"' index.html || sed -i '0,/<head>/s//<head>\n<meta name="robots" content="noindex, nofollow">/' index.html
+          git init -q -b gh-pages
+          git config user.name "dashboard-bot"
+          git config user.email "dashboard-bot@users.noreply.github.com"
+          git add -A
+          git commit -q -m "site: $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M') KST"
+          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
+          echo "배포 완료 → https://rsm0kk.github.io/bok-monitor/"
