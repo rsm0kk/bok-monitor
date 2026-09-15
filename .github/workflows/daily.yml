@@ -7,6 +7,8 @@ name: daily-dashboard
 # GitHub 예약 실행은 수~수십 분 늦을 수 있다.
 on:
   schedule:
+    # 21:40 UTC(일~목) = 06:40 KST(월~금) : 아침 브리핑 회차 — 간밤 미국장 재무부 곡선·야후 종가가 올라온 뒤, 08:00 전 도착
+    - cron: '40 21 * * 0-4'
     - cron: '30 0 * * *'
     - cron: '30 7 * * *'
     - cron: '0 13 * * 1-5'
@@ -57,6 +59,10 @@ jobs:
 
       - name: 야후 당일치
         run: node fetch-yahoo.js
+
+      # 아침 브리핑의 금리는 FRED(1~5일 지연) 대신 재무부 당일 곡선·뉴욕 연은을 쓴다
+      - name: 재무부·뉴욕연은 당일 금리
+        run: node fetch-rates.js
 
       - name: 빌드 (키 잔존 검사 포함)
         run: node build.js

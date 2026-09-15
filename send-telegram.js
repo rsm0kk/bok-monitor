@@ -47,15 +47,28 @@ async function main() {
   const html = fs.readFileSync(f, 'utf8');
   if (has('dry-run')) { console.log(`DRY ${visible(html)}자 · 받는 곳 ${CHATS.length} · 토큰 ${TOKEN ? '있음' : '없음'}`); return 0; }
   if (!TOKEN || !CHATS.length) { console.log('SKIP 텔레그램 미설정 (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)'); return 0; }
-  if (has('morning-only')) {
-    const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false }).format(new Date()));
+  // --morning-only: 한국 평일 12시 전, 하루 한 번. 06:40 회차가 늦거나 실패하면 09:30 회차가 대신 보낸다.
+  // 기록은 cache/telegram-sent.json — 워크플로의 캐시 커밋 단계가 저장소에 남긴다(Actions 는 매번 새 PC 라서).
+  const SENT = path.join(__dirname, 'cache', 'telegram-sent.json');
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false, weekday: 'short' })
+    .formatToParts(new Date()).map((x) => [x.type, x.value]));
+  const kDate = `${p.year}-${p.month}-${p.day}`;
+  if (has('morning-only') && !has('force')) {
+    const h = Number(p.hour);
+    if (p.weekday === 'Sat' || p.weekday === 'Sun') { console.log(`SKIP ${kDate} 주말`); return 0; }
     if (h >= 12) { console.log(`SKIP KST ${h}시 — 아침 회차만 보냄`); return 0; }
+    let rec = {}; try { rec = JSON.parse(fs.readFileSync(SENT, 'utf8')); } catch {}
+    if (rec.date === kDate) { console.log(`SKIP ${kDate} 이미 보냄 (${rec.sentAt})`); return 0; }
   }
   if (visible(html) > 4096) { console.log(`FAIL ${visible(html)}자 — 4096 초과`); return 0; }
   let ok = 0;
   for (const c of CHATS) {
     try { await api('sendMessage', { chat_id: c, text: html, parse_mode: 'HTML', link_preview_options: { is_disabled: true } }); ok += 1; }
     catch (e) { console.log(`FAIL ${c}: ${e.message}`); }
+  }
+  if (ok && has('morning-only')) {
+    fs.mkdirSync(path.dirname(SENT), { recursive: true });
+    fs.writeFileSync(SENT, JSON.stringify({ date: kDate, sentAt: new Date().toISOString(), chats: ok }, null, 2));
   }
   console.log(`전송 ${ok}/${CHATS.length}곳 · ${visible(html)}자`);
   return 0;

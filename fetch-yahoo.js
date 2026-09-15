@@ -24,6 +24,14 @@ const SYMS = [
   { key: 'vix', sym: '^VIX', label: 'VIX', scale: 1 },
   { key: 'sp500', sym: '^GSPC', label: 'S&P 500', scale: 1 },
   { key: 'gold', sym: 'GC=F', label: '금 선물 ($/oz)', scale: 1 },
+  // 아침 브리핑(digest.js)용 — FRED 계열과 키가 겹치지 않게 이름을 달리한다(dxy ≠ FRED dxy_broad, krw ≠ FRED usdkrw)
+  { key: 'nasdaq', sym: '^IXIC', label: '나스닥 종합', scale: 1 },
+  { key: 'sox', sym: '^SOX', label: '필라델피아 반도체', scale: 1 },
+  { key: 'dxy', sym: 'DX-Y.NYB', label: '달러인덱스 (ICE DXY)', scale: 1 },
+  { key: 'krw', sym: 'KRW=X', label: '원/달러 (야후)', scale: 1 },
+  { key: 'move', sym: '^MOVE', label: 'MOVE (채권 변동성)', scale: 1 },
+  { key: 'hyg', sym: 'HYG', label: '하이일드 회사채 ETF', scale: 1 },
+  { key: 'lqd', sym: 'LQD', label: '투자등급 회사채 ETF', scale: 1 },
 ];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
