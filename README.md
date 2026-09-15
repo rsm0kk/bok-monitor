@@ -1,5 +1,14 @@
 # 국장 정책·수출 모니터 (bok-monitor)
 
+> ## ⚠ 2026-09-15 부터 마스터는 GitHub 저장소다
+> 매일 갱신은 **GitHub Actions 루틴** `daily-dashboard`(저장소 `rsm0kk/bok-monitor` 의 `main`)가 한다. PC 가 꺼져 있어도 돈다.
+> - 실행 시각(KST): 매일 09:30 · 16:30, 평일 22:00 (미국 지표 발표 직후). 실행 기록: https://github.com/rsm0kk/bok-monitor/actions
+> - 코드·데이터·캐시의 마스터는 `main` 브랜치다. 로컬 작업 사본은 `C:/Users/rsm86/bok-monitor-src`(OneDrive 밖). 이 OneDrive 폴더는 옛 사본이다 — 여기서 고치면 반영되지 않는다.
+> - 사이트는 `gh-pages` 브랜치에서 서비스된다(주소는 그대로 https://rsm0kk.github.io/bok-monitor/).
+> - 키는 저장소 Secrets `ECOS_API_KEY`·`FRED_API_KEY` 에서 읽는다. 없으면 두 단계만 옛 캐시로 넘어간다.
+> - 새 수출 워크북·보고서 파일은 GitHub 웹에서 `data/` 폴더에 **Add file → Upload files** 로 올리면 다음 실행에 반영된다.
+> - 윈도우 예약 작업 `BOK Monitor Daily` 는 두 곳이 번갈아 덮어쓰지 않도록 꺼 두었다.
+
 한국은행 **통화신용정책보고서(2026년 9월)** 의 그림 원본 데이터 110시트와 **한국 수출통계 104품목** 워크북을 한 화면에 정리하고,
 보고서 이후의 최신치는 **ECOS** 에서 매일 받아 붙이는 대시보드. `국장 요약` 섹터 모니터의 하위 도구이며 코드·캐시가 완전히 분리돼 있다.
 
