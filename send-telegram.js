@@ -45,6 +45,8 @@ async function main() {
   const f = path.join(__dirname, 'out', 'digest.html');
   if (!fs.existsSync(f)) { console.log('SKIP out/digest.html 없음 — digest.js 먼저'); return 0; }
   const html = fs.readFileSync(f, 'utf8');
+  // digest.js 는 전일·금일 데이터가 하나도 없으면 빈 파일을 쓴다 — 그날은 보내지 않는다
+  if (!html.trim()) { console.log('SKIP 전일·금일 데이터 없음 — 보내지 않음'); return 0; }
   if (has('dry-run')) { console.log(`DRY ${visible(html)}자 · 받는 곳 ${CHATS.length} · 토큰 ${TOKEN ? '있음' : '없음'}`); return 0; }
   if (!TOKEN || !CHATS.length) { console.log('SKIP 텔레그램 미설정 (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)'); return 0; }
   // --morning-only: 한국 평일 12시 전, 하루 한 번. 06:40 회차가 늦거나 실패하면 09:30 회차가 대신 보낸다.
