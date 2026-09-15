@@ -67,6 +67,13 @@ jobs:
       - name: 공개 가능 검사
         run: node audit.js
 
+      # 매크로 아침 브리핑 — 09:30 KST 회차만 텔레그램 봇으로 보낸다(Secrets 가 없으면 SKIP 한 줄).
+      - name: 텔레그램 아침 브리핑
+        run: node digest.js && node send-telegram.js --morning-only
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: 캐시 커밋 (컨센서스 기록 누적용)
         run: |
           git config user.name "dashboard-bot"
