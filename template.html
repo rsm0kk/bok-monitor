@@ -541,7 +541,7 @@ R.export = (sec) => {
   <div class="kpi"><div class="l">104품목 합계</div><div class="v">$${fmt(total104[iA] / 1000, 1)}<small>B</small></div><div class="s">Y/Y ${sgn(yoyOf(total104, iA), 1)}% · M/M ${sgn((total104[iA] / total104[iA - 1] - 1) * 100, 1)}%</div></div>
   <div class="kpi"><div class="l">반도체 24품목</div><div class="v">$${fmt(semi.amt / 1000, 1)}<small>B</small></div><div class="s">Y/Y ${sgn(semi.yoy, 1)}% · 합계 비중 ${fmt(semi.share, 1)}%</div></div>
   <div class="kpi"><div class="l">반도체 제외 80품목</div><div class="v">$${fmt(exSum / 1000, 1)}<small>B</small></div><div class="s">Y/Y ${sgn(yoyOf(exTot, iA), 1)}%</div></div>
-  <div class="kpi"><div class="l">${esc(E.estimateMonths[0] || '(E)')} 환산 추정</div><div class="v">$${fmt(total104[E.months.length - 1] / 1000, 1)}<small>B</small></div><div class="s">1~10일 누적 × 20/8 · 증감률 산출 안 함 (하락 과장)</div></div></div>
+  <div class="kpi"><div class="l">${esc(E.estimateMonths[0] || '(E)')} 환산 추정</div><div class="v">$${fmt(total104[E.months.length - 1] / 1000, 1)}<small>B</small></div><div class="s">${esc(E.estimate.period)} 누적 × ${esc(E.estimate.factor || '조업일 환산')} · 증감률 산출 안 함 (하락 과장)</div></div></div>
   <div class="note">${esc(E.meta['최신월 성격'] || '')}</div>`;
   g.appendChild(kc);
   const it = B.itExport;
@@ -596,9 +596,9 @@ R.export = (sec) => {
   // (E) 포착률
   const est = E.estimate; const big = est.rows.filter((r) => (r.prev || 0) >= 50); const med = median(big.map((r) => r.capture));
   const ec = document.createElement('div'); ec.className = 'card';
-  ec.innerHTML = `<h3>${esc(E.estimateMonths[0] || '(E)')} 1~10일 포착률 — 월초 공백 vs 둔화</h3><div class="src">${esc(est.meta['기준일'] || '')}</div><div class="note">${esc(est.meta['환산 산식'] || '')}<br>${esc(est.meta['포착률'] || '')}</div><div class="toolbar"><span class="badge">규모 $50M↑ 품목 포착률 중앙값 ${fmt(med, 1)}%</span><span class="ref">중앙값보다 크게 낮으면 그 품목만의 월초 공백 또는 둔화 신호 — 21일 회차에서 재확인</span></div><div class="tbl" data-h="t" style="max-height:520px"></div>`;
+  ec.innerHTML = `<h3>${esc(E.estimateMonths[0] || '(E)')} ${esc(est.period)} 포착률 — 공백 vs 둔화</h3><div class="src">${esc(est.meta['기준일'] || '')}</div><div class="note">${esc(est.meta['환산 산식'] || '')}<br>${esc(est.meta['포착률'] || '')}</div><div class="toolbar"><span class="badge">규모 $50M↑ 품목 포착률 중앙값 ${fmt(med, 1)}%</span><span class="ref">중앙값보다 크게 낮으면 그 품목만의 공백 또는 둔화 신호 — ${esc(est.nextCheck)}에서 재확인</span></div><div class="tbl" data-h="t" style="max-height:520px"></div>`;
   g.appendChild(ec);
-  $('[data-h="t"]', ec).innerHTML = `<table><thead><tr><th class="tl">품목</th><th class="tl">카테고리</th><th>1~10일 $M</th><th>(E) $M</th><th>${esc(E.latestActual)} 실측 $M</th><th>포착률 %</th><th>중앙값 대비 %p</th></tr></thead><tbody>${est.rows.filter((r) => (r.prev || 0) >= 50).sort((a, b) => b.est - a.est).map((r) => `<tr><td class="tl">${esc(r.item)}</td><td class="tl">${esc(r.cat)}</td>${tdN(r.d10, 0)}${tdN(r.est, 0)}${tdN(r.prev, 0)}${tdN(r.capture, 1)}${tdN(r.capture != null && med != null ? r.capture - med : null, 1, true)}</tr>`).join('')}</tbody></table>`;
+  $('[data-h="t"]', ec).innerHTML = `<table><thead><tr><th class="tl">품목</th><th class="tl">카테고리</th><th>${esc(est.period)} $M</th><th>(E) $M</th><th>${esc(E.latestActual)} 실측 $M</th><th>포착률 %</th><th>중앙값 대비 %p</th></tr></thead><tbody>${est.rows.filter((r) => (r.prev || 0) >= 50).sort((a, b) => b.est - a.est).map((r) => `<tr><td class="tl">${esc(r.item)}</td><td class="tl">${esc(r.cat)}</td>${tdN(r.d10, 0)}${tdN(r.est, 0)}${tdN(r.prev, 0)}${tdN(r.capture, 1)}${tdN(r.capture != null && med != null ? r.capture - med : null, 1, true)}</tr>`).join('')}</tbody></table>`;
   makeSortable($('table', ec));
   // 국가별
   const cn = E.country; const items = Object.keys(cn.items);

@@ -238,6 +238,11 @@ def extract_exports(path):
                             'est': num(r[6]), 'prev': num(r[7]), 'capture': num(r[8]), 'prevYear': num(r[10]),
                             'wt': num(r[12]), 'asp': num(r[13]), 'note': r[14] if len(r) > 14 else None})
     est['header'] = [label(h) for h in hdr[1:15]]
+    # 회차(11일 = 1~10일, 21일 = 1~20일)는 매번 바뀌므로 화면 문구에 고정하지 않고 환산 산식에서 읽는다
+    m = re.search(r'(1~\d+일) 누적 잠정치 × 총조업일 (\d+) ÷ 해당기간 조업일 (\d+)', est['meta'].get('환산 산식', ''))
+    est['period'] = m.group(1) if m else '부분월'
+    est['factor'] = '%s/%s' % (m.group(2), m.group(3)) if m else None
+    est['nextCheck'] = '21일 회차' if est['period'] == '1~10일' else '다음 달 1일 월전체 실측'
     ex['estimate'] = est
     co = [list(r) for r in wb['국가별'].iter_rows(values_only=True)]
     hi = next(i for i, r in enumerate(co) if r and len(r) > 1 and r[1] == '카테고리')
