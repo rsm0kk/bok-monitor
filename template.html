@@ -532,6 +532,39 @@ R.macro = (sec) => {
 
 R.export = (sec) => {
   const g = document.createElement('div'); g.className = 'grid'; sec.appendChild(g);
+  // 산업통상부 월간 수출입동향 — 매월 1일 발표, 104품목 워크북(관세청 HS 확정 반영)보다 2주 빠른 월전체 통관 잠정치
+  const MO = ((DATA.motie && DATA.motie.months) || [])[0];
+  if (MO) {
+    const mon = (s) => `${Number(s.slice(5, 7))}월`;
+    const n = MO.itemCols.length - 1, p = n - 1;
+    const semi = MO.items.find((x) => x.name === '반도체');
+    const exNow = MO.export.amt - semi.amt[n], exPrev = MO.export.prevYear - semi.amt[0];
+    const mom = (a, b) => (a != null && b ? (a / b - 1) * 100 : null);
+    const B$ = (v, d = 1) => `$${fmt(v / 1000, d)}<small>B</small>`;
+    // 같은 달 비교: 104품목 반도체(HS 24품목) 실측 ÷ MTI 반도체 — 분류 범위 차이를 보여 주는 비율일 뿐, (E) 를 고치지 않는다
+    const iE = E.months.indexOf(MO.itemCols[p]), hsSemi = iE >= 0 ? E.categories.find((c) => c.name.startsWith('반도체')).total[iE] : null;
+    const eIdx = E.months.indexOf(MO.month + ' (E)'), hsSemiE = eIdx >= 0 ? E.categories.find((c) => c.name.startsWith('반도체')).total[eIdx] : null;
+    const ratio = hsSemi && semi.amt[p] ? hsSemi / semi.amt[p] : null;
+    const mc = document.createElement('div'); mc.className = 'card';
+    mc.innerHTML = `<h3>${MO.month.slice(0, 4)}년 ${mon(MO.month)} 수출입동향 — 산업통상부 발표 (월전체 통관 잠정)</h3><div class="src">산업통상부 ${esc(MO.released)} 보도자료 「${esc(MO.title)}」 · <a href="${esc(MO.url)}" target="_blank" rel="noopener">원문</a> · 증감률은 전년 동월 대비</div><div class="kpis">
+    <div class="kpi"><div class="l">${mon(MO.month)} 총수출</div><div class="v">${B$(MO.export.amt)}</div><div class="s"><span class="${tone(MO.export.yoy)}">Y/Y ${sgn(MO.export.yoy, 1)}%</span> · 가속 ${sgn(MO.itemsTotal.yoy[n] - MO.itemsTotal.yoy[p], 1)}%p · M/M ${sgn(mom(MO.itemsTotal.amt[n], MO.itemsTotal.amt[p]), 1)}%</div></div>
+    <div class="kpi"><div class="l">일평균 수출</div><div class="v">${B$(MO.dailyAvg.amt, 2)}</div><div class="s"><span class="${tone(MO.dailyAvg.yoy)}">Y/Y ${sgn(MO.dailyAvg.yoy, 1)}%</span> · 조업일 ${fmt(MO.workdays.now, 1)}일 (전년 ${fmt(MO.workdays.prevYear, 1)}일)</div></div>
+    <div class="kpi"><div class="l">반도체</div><div class="v">${B$(semi.amt[n])}</div><div class="s"><span class="${tone(semi.yoy[n])}">Y/Y ${sgn(semi.yoy[n], 1)}%</span> · 가속 ${sgn(semi.yoy[n] - semi.yoy[p], 1)}%p · 비중 ${fmt(semi.amt[n] / MO.export.amt * 100, 1)}%</div></div>
+    <div class="kpi"><div class="l">반도체 외</div><div class="v">${B$(exNow)}</div><div class="s"><span class="${tone(mom(exNow, exPrev))}">Y/Y ${sgn(mom(exNow, exPrev), 1)}%</span> · 총수출 − 반도체로 계산</div></div>
+    <div class="kpi"><div class="l">무역수지</div><div class="v ${tone(MO.balance)}">${MO.balance >= 0 ? '+' : '−'}${B$(Math.abs(MO.balance))}</div><div class="s">수입 ${B$(MO.import.amt)} · Y/Y ${sgn(MO.import.yoy, 1)}%</div></div>
+    <div class="kpi"><div class="l">${esc(MO.cumulative.label)} 누적 수출</div><div class="v">${B$(MO.cumulative.export)}</div><div class="s">Y/Y ${sgn(MO.cumulative.exportYoy, 1)}% · 수지 +${B$(MO.cumulative.balance)}</div></div></div>
+    <div class="note">이 카드는 매월 1일 산업통상부 발표(MTI 20대 품목·9대 지역)다. 아래 104품목(HS) 카드들의 ${esc(mon(MO.month))}(E)는 아직 ${esc(E.estimate.period)} 환산 추정이고, 품목 세부가 들어간 월전체 HS 실적이 반영된 새 워크북이 와야 바뀐다. MTI 와 HS 는 품목 범위가 달라 금액을 그대로 맞비교하지 않는다(아래 해석은 같은 달 비율만 참고로 쓴다).${ratio && hsSemiE ? `<br><b>해석</b> · ${mon(MO.itemCols[p])} 104품목 반도체(HS 24품목) $${fmt(hsSemi / 1000, 1)}B 는 MTI 반도체 $${fmt(semi.amt[p] / 1000, 1)}B 의 ${fmt(ratio, 2)}배였다. MTI 반도체가 ${mon(MO.month)}에 ${sgn(mom(semi.amt[n], semi.amt[p]), 1)}% 늘었으므로, 104품목 반도체 ${esc(E.estimateMonths[0])} $${fmt(hsSemiE / 1000, 1)}B(환산 추정)는 실측보다 낮게 잡혀 있을 가능성이 크다.` : ''}</div>
+    <div class="two"><div data-h="mbar"></div><div data-h="ybar"></div></div>
+    <div class="two" style="margin-top:10px"><div class="tbl" data-h="mt" style="max-height:460px"></div><div class="tbl" data-h="rt" style="max-height:460px"></div></div>`;
+    g.appendChild(mc);
+    const mm = MO.monthly;
+    chart($('[data-h="mbar"]', mc), { title: '월별 수출액', x: MO.monthlyCols, series: [{ type: 'bar', label: '수출액', values: mm.export, unit: '억 달러', color: C.red }], dec: 0, height: 220, minWidth: 420, src: '산업통상부 수출입동향 · 억 달러' });
+    const ys = MO.items.map((x) => ({ name: x.name, v: x.yoy[n] })).sort((a, b) => b.v - a.v);
+    chart($('[data-h="ybar"]', mc), { title: `20대 품목 ${mon(MO.month)} Y/Y`, x: ys.map((x) => x.name), series: [{ type: 'bar', label: 'Y/Y', values: ys.map((x) => x.v), unit: '%', color: C.red, colorAt: (i, v) => v >= 0 ? C.red : C.blue, signed: true }], xfmt: (s) => s, xfull: (s) => s, dec: 1, height: 220, minWidth: 520, src: '산업통상부 20대 주력 품목 · 전년 동월 대비 %' });
+    $('[data-h="mt"]', mc).innerHTML = `<table><thead><tr><th class="tl">품목</th><th>${mon(MO.month)} $M</th><th>Y/Y %</th><th>Y/Y 가속 %p</th><th>M/M %</th><th>비중 %</th></tr></thead><tbody>${MO.items.map((x) => `<tr><td class="tl">${esc(x.name)}</td>${tdN(x.amt[n], 0)}${tdN(x.yoy[n], 1, true)}${tdN(x.yoy[n] - x.yoy[p], 1, true)}${tdN(mom(x.amt[n], x.amt[p]), 1, true)}${tdN(x.amt[n] / MO.export.amt * 100, 1)}</tr>`).join('')}</tbody></table>`;
+    $('[data-h="rt"]', mc).innerHTML = `<table><thead><tr><th class="tl">지역</th><th>${mon(MO.month)} $M</th><th>Y/Y %</th><th>Y/Y 가속 %p</th><th>M/M %</th></tr></thead><tbody>${MO.regions.map((r) => `<tr><td class="tl">${esc(r.name)}</td>${tdN(r.amt[1], 0)}${tdN(r.yoy[1], 1, true)}${tdN(r.yoy[1] - r.yoy[0], 1, true)}${tdN(mom(r.amt[1], r.amt[0]), 1, true)}</tr>`).join('')}</tbody></table>`;
+    makeSortable($('[data-h="mt"] table', mc)); makeSortable($('[data-h="rt"] table', mc));
+  }
   // KPI
   const ie = last(B.itExport.total), de = last(B.dailyExport.exp);
   const semi = catSummary.find((c) => c.name === '반도체'), ex = catSummary.filter((c) => c.name !== '반도체');

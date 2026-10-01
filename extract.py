@@ -242,7 +242,7 @@ def extract_exports(path):
     m = re.search(r'(1~\d+일) 누적 잠정치 × 총조업일 (\d+) ÷ 해당기간 조업일 (\d+)', est['meta'].get('환산 산식', ''))
     est['period'] = m.group(1) if m else '부분월'
     est['factor'] = '%s/%s' % (m.group(2), m.group(3)) if m else None
-    est['nextCheck'] = '21일 회차' if est['period'] == '1~10일' else '다음 달 1일 월전체 실측'
+    est['nextCheck'] = '21일 회차' if est['period'] == '1~10일' else '월전체 HS 실적 워크북'
     ex['estimate'] = est
     co = [list(r) for r in wb['국가별'].iter_rows(values_only=True)]
     hi = next(i for i, r in enumerate(co) if r and len(r) > 1 and r[1] == '카테고리')
