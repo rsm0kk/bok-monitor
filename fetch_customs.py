@@ -1,10 +1,10 @@
-"""
+﻿"""
 fetch_customs.py — 관세청 품목별·국가별 수출실적 API(공공데이터포털 15100475)로 104품목 워크북보다 새로운 달을 받아
 data/customs-hs.json 에 저장한다. extract.py 가 이 파일로 워크북의 (E) 월을 월전체 실측으로 바꾼다.
 
 왜 PC 에서 도는가: 이 API(apis.data.go.kr/1220000/nitemtrade)는 해외 IP(GitHub Actions 서버)에 403 을 준다
 (전력기기 대시보드에서 확인). 그래서 수집만 이 PC 가 하고, 결과 파일을 main 에 커밋하면 GitHub 루틴이 빌드한다.
-  → customs-daily.ps1 이 git pull → 이 스크립트 → 바뀌었으면 커밋·푸시·워크플로 실행까지 한다.
+  → customs_daily.py 가 git pull → 이 스크립트 → 바뀌었으면 커밋·푸시·워크플로 실행까지 한다.
 
 실행:
   python fetch_customs.py                 # 워크북 최신 실측월 다음 달이 API 에 올라왔을 때만 전체 수집
