@@ -223,6 +223,16 @@ def extract_exports(path):
                                'avg3': num(r[10]), 'mm': num(r[11]), 'cum12': num(r[12]), 'cumYoy': num(r[13]),
                                'wtYoy': num(r[14]), 'aspYoy': num(r[15])})
     ex['momentumNote'] = str(mo[2][1]) if len(mo) > 2 and mo[2][1] else None
+    # 모멘텀 시트의 중량·ASP Y/Y 열은 일부 행이 이웃 품목 값과 뒤섞여 있다(2026-09-21 회차: 기타 화장품 행에 스크러버 값 등 36행).
+    # 같은 워크북 카테고리 시트의 월별 중량·ASP 로 다시 계산한다 — 나머지 열(금액·Y/Y·가속·누적)은 시계열과 일치해 그대로 쓴다.
+    ia = months.index(ex['latestActual'])
+    series = {it['name']: it for c in ex['categories'] for it in c['items']}
+    for r in ex['momentum']:
+        it = series.get(r['item'])
+        if it and ia >= 12:
+            for k, f in (('wtYoy', 'wt'), ('aspYoy', 'asp')):
+                a, b = it[f][ia], it[f][ia - 12]
+                r[k] = round((a / b - 1) * 100, 1) if a is not None and b else None
     es_name = next(s for s in wb.sheetnames if '근거' in s)
     es = [list(r) for r in wb[es_name].iter_rows(values_only=True)]
     est = {'sheet': es_name, 'meta': {}, 'rows': []}
@@ -264,6 +274,111 @@ def extract_exports(path):
     return ex
 
 
+# ───────────────────────── 관세청 API 로 (E) 월을 월전체 실측으로 교체 ─────────────────────────
+def _pct(a, b):
+    return round((a / b - 1) * 100, 1) if a is not None and b else None
+
+
+def _ym_add(ym, k):
+    y, m = map(int, ym.split('-'))
+    t = y * 12 + (m - 1) + k
+    return f'{t // 12:04d}-{t % 12 + 1:02d}'
+
+
+def _base_flag(prev):
+    if prev is None:
+        return None
+    return '기저 0 근접' if prev < 1 else '기저 과소' if prev < 5 else None
+
+
+def apply_customs(ex, cu, base=None):
+    """fetch_customs.py 결과(cu)로 워크북 최신 실측월(base) 이후 달을 채운다. 워크북 규칙을 그대로 재현한다:
+       카테고리 합계 = 품목 합, M/M·Y/Y 는 소수 1자리, ASP = 금액÷중량, 모멘텀 가속 = 당월 Y/Y − 3개월 전 Y/Y,
+       3개월 평균 = 최근 3개월 Y/Y 평균, 누적 = 최근 12개월 vs 직전 12개월, 기저 표시는 전년 동월 $1M·$5M 미만.
+       base 를 주면 그 달까지만 워크북 실측으로 보고 나머지를 덮는다(검증용)."""
+    months = ex['months']
+    base = base or ex['latestActual']
+    new = [m for m in cu['months'] if m > base and cu.get('itemsWithTarget', 0) and all(
+        m in v['amt'] for v in cu['items'].values() if v['amt'])]
+    new = [m for m in new if m <= cu['latestMonth']]
+    if not new:
+        return None
+    ex['officialMonth'] = ex['latestActual']
+    replaced = []
+    for m in new:
+        if m + ' (E)' in months:
+            idx = months.index(m + ' (E)'); months[idx] = m; replaced.append(m)
+        elif m in months:
+            idx = months.index(m)
+        else:
+            months.append(m); idx = len(months) - 1
+            for c in ex['categories']:
+                for arr in [c['total'], c['mm'], c['yoy']] + [it[k] for it in c['items'] for k in ('amt', 'mm', 'yoy', 'wt', 'asp')]:
+                    arr.append(None)
+        for c in ex['categories']:
+            for it in c['items']:
+                v = cu['items'].get(f"{c['sheet']}|{it['name']}")
+                if not v:
+                    continue
+                k = v.get('scale', 1.0)  # 워크북과 기준월 차이가 큰 품목만 비율 보정(fetch_customs.SCALE_OVER)
+                a = v['amt'].get(m, 0.0) * k; w = v['wt'].get(m, 0.0) * k
+                it['amt'][idx] = round(a, 4); it['wt'][idx] = round(w, 3)
+                it['asp'][idx] = round(a * 1000 / w, 4) if w else None
+                it['mm'][idx] = _pct(a, it['amt'][idx - 1]); it['yoy'][idx] = _pct(a, it['amt'][idx - 12] if idx >= 12 else None)
+            t = round(sum(it['amt'][idx] or 0 for it in c['items']), 4)
+            c['total'][idx] = t; c['mm'][idx] = _pct(t, c['total'][idx - 1]); c['yoy'][idx] = _pct(t, c['total'][idx - 12] if idx >= 12 else None)
+    ex['estimateMonths'] = [m for m in months if '(E)' in m]
+    last = new[-1]; ia = months.index(last)
+    ex['latestActual'] = last
+    # 모멘텀 재계산 — 카테고리 표기·HS 는 기존 모멘텀 시트 값을 쓴다
+    meta = {r['item']: r for r in ex['momentum']}
+    rows = []
+    for c in ex['categories']:
+        for it in c['items']:
+            a, y, w, s = it['amt'], it['yoy'], it['wt'], it['asp']
+            if a[ia] is None:
+                continue
+            prev = a[ia - 12] if ia >= 12 else None
+            cum = sum(x or 0 for x in a[ia - 11:ia + 1]); cumP = sum(x or 0 for x in a[ia - 23:ia - 11]) if ia >= 23 else None
+            y3 = [v for v in y[ia - 2:ia + 1] if v is not None]
+            old = meta.get(it['name'], {})
+            rows.append({'cat': old.get('cat', c['name']), 'item': it['name'], 'hs': old.get('hs', it['hs']), 'amt': a[ia], 'yoy': y[ia],
+                         'baseFlag': _base_flag(prev), 'prevYear': prev,
+                         'accel': round(y[ia] - y[ia - 3], 1) if y[ia] is not None and ia >= 3 and y[ia - 3] is not None else None,
+                         'avg3': round(sum(y3) / 3, 4) if len(y3) == 3 else None, 'mm': it['mm'][ia], 'cum12': round(cum, 4),
+                         'cumYoy': _pct(cum, cumP), 'wtYoy': _pct(w[ia], w[ia - 12] if ia >= 12 else None),
+                         'aspYoy': _pct(s[ia], s[ia - 12] if ia >= 12 else None)})
+    rows.sort(key=lambda r: (r['yoy'] is None, -(r['yoy'] or 0)))
+    for i, r in enumerate(rows):
+        r['rank'] = i + 1
+    ex['momentum'] = rows
+    ex['momentumNote'] = (f'Y/Y 내림차순. 기준월 {last} — 관세청 품목별 수출실적 API 월전체 실측으로 재계산했다(워크북 실측은 {base}까지). '
+                          f'가속도 = 당월 Y/Y − 3개월 전({months[ia - 3]}) Y/Y, 단위 %p. "기저" 표시는 전년 동월 금액이 $5M 미만이라 Y/Y 가 배율에 가깝다는 뜻이다.')
+    # 국가별 상위 5개국 — 워크북이 고른 나라를 그대로 두고 새 달만 붙인다
+    co = ex['country']
+    for name, d in co['items'].items():
+        v = next((x for x in cu['items'].values() if x['name'] == name), None)
+        if not v:
+            continue
+        k = v.get('scale', 1.0)
+        for cname, cc in d['countries'].items():
+            ca = {ym: x * k for ym, x in v['countries'].get(cc['code'], {}).get('amt', {}).items()}
+            for m in new:
+                amt = ca.get(m, 0.0); tot = v['amt'].get(m, 0.0) * k
+                cum = sum(ca.get(_ym_add(m, -k), 0.0) for k in range(12)); cumP = sum(ca.get(_ym_add(m, -k), 0.0) for k in range(12, 24))
+                cc['months'][m] = {'amt': round(amt, 4), 'yoy': _pct(amt, ca.get(_ym_add(m, -12))), 'cum12': round(cum, 4),
+                                   'cumYoy': _pct(cum, cumP), 'share': round(amt / tot * 100, 4) if tot else None}
+    co['months'] = sorted(set(co['months']) | set(new))[-12:]
+    for d in co['items'].values():
+        for cc in d['countries'].values():
+            cc['months'] = {k: v for k, v in cc['months'].items() if k in co['months']}
+    info = {'applied': new, 'replacedEstimate': replaced, 'base': base, 'fetchedAt': cu.get('fetchedAt'), 'source': cu.get('source'),
+            'url': cu.get('url'), 'check': cu.get('check'),
+            'scaled': [f"{v['name']} ×{v['scale']:.3f}" for v in cu['items'].values() if v.get('scale')]}
+    ex['customs'] = info
+    return info
+
+
 def main():
     bok_path = arg('bok') or newest('통화신용정책보고서 원본 데이터*.xlsx')
     exp_path = arg('exp') or newest('한국 수출통계*.xlsx')
@@ -272,6 +387,11 @@ def main():
     out = {'generatedAt': dt.datetime.now().strftime('%Y-%m-%d %H:%M'),
            'files': {'bok': os.path.basename(bok_path), 'exp': os.path.basename(exp_path)},
            'bok': extract_bok(bok_path), 'exports': extract_exports(exp_path)}
+    cu_path = os.path.join(DATA, 'customs-hs.json')
+    if os.path.exists(cu_path):
+        with open(cu_path, encoding='utf-8') as f:
+            info = apply_customs(out['exports'], json.load(f))
+        print('관세청 API 보강:', '%s 실측 반영 (워크북 실측 %s까지)' % (', '.join(info['applied']), info['base']) if info else '워크북보다 새 달 없음')
     os.makedirs(OUT, exist_ok=True)
     p = os.path.join(OUT, 'data.json')
     with open(p, 'w', encoding='utf-8') as f:
