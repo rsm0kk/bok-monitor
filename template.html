@@ -532,6 +532,36 @@ R.macro = (sec) => {
 
 R.export = (sec) => {
   const g = document.createElement('div'); g.className = 'grid'; sec.appendChild(g);
+  // 관세청 열흘 단위 수출입 현황(잠정치) — 매월 11일·21일 발표. 진행 중인 달의 가장 빠른 공식 수치라 맨 위에 둔다
+  const FL = DATA.flash, MO0 = ((DATA.motie && DATA.motie.months) || [])[0];
+  if (FL && FL.export) {
+    const B$ = (v, d = 1) => `$${fmt(v / 1000, d)}<small>B</small>`;
+    const semiPrev = FL.semi.amt / (1 + FL.semi.yoy / 100);
+    const exNow = FL.export.amt - FL.semi.amt, exPrev = FL.export.prevYear - semiPrev, exYoy = (exNow / exPrev - 1) * 100;
+    // 직전 달 월전체(산업통상부) Y/Y 와의 차이 — 열흘치와 한 달치라 기간이 달라 '참고 가속'으로만 쓴다
+    const pm = MO0 ? `${Number(MO0.month.slice(5, 7))}월` : '';
+    const moSemi = MO0 ? MO0.items.find((x) => x.name === '반도체') : null;
+    const acc = (a, b) => (b != null ? ` · ${pm} 월전체 대비 ${sgn(a - b, 1)}%p` : '');
+    const fc = document.createElement('div'); fc.className = 'card';
+    fc.innerHTML = `<h3>${FL.month.slice(0, 4)}년 ${esc(FL.period)} 수출입 — 관세청 열흘 속보 (통관 잠정)</h3><div class="src">관세청 ${esc(FL.released)} 발표 「${esc(FL.title)}」 · <a href="${esc(FL.url)}" target="_blank" rel="noopener">원문</a> · 증감률은 전년 같은 기간 대비 · 조업일 ${fmt(FL.workdays.now, 1)}일 (전년 ${fmt(FL.workdays.prevYear, 1)}일)</div><div class="kpis">
+    <div class="kpi"><div class="l">${esc(FL.period)} 총수출</div><div class="v">${B$(FL.export.amt)}</div><div class="s"><span class="${tone(FL.export.yoy)}">Y/Y ${sgn(FL.export.yoy, 1)}%</span>${acc(FL.export.yoy, MO0 && MO0.export.yoy)}</div></div>
+    <div class="kpi"><div class="l">일평균 수출</div><div class="v">${B$(FL.dailyAvg.amt, 2)}</div><div class="s"><span class="${tone(FL.dailyAvg.yoy)}">Y/Y ${sgn(FL.dailyAvg.yoy, 1)}%</span>${acc(FL.dailyAvg.yoy, MO0 && MO0.dailyAvg.yoy)}</div></div>
+    <div class="kpi"><div class="l">반도체</div><div class="v">${B$(FL.semi.amt)}</div><div class="s"><span class="${tone(FL.semi.yoy)}">Y/Y ${sgn(FL.semi.yoy, 1)}%</span>${acc(FL.semi.yoy, moSemi && moSemi.yoy[moSemi.yoy.length - 1])} · 비중 ${fmt(FL.semi.share, 1)}% (전년 ${fmt(FL.semi.sharePrev, 1)}%, ${sgn(FL.semi.share - FL.semi.sharePrev, 1)}%p)</div></div>
+    <div class="kpi"><div class="l">반도체 외</div><div class="v">${B$(exNow)}</div><div class="s"><span class="${tone(exYoy)}">Y/Y ${sgn(exYoy, 1)}%</span> · 총수출 − 반도체로 계산</div></div>
+    <div class="kpi"><div class="l">무역수지</div><div class="v ${tone(FL.balance)}">${FL.balance >= 0 ? '+' : '−'}${B$(Math.abs(FL.balance))}</div><div class="s">수입 ${B$(FL.import.amt)} · Y/Y ${sgn(FL.import.yoy, 1)}%</div></div>
+    <div class="kpi"><div class="l">${esc(FL.cumExport.label)} 누적 수출</div><div class="v">${B$(FL.cumExport.amt)}</div><div class="s">연간 $1조까지 ${B$(1000000 - FL.cumExport.amt)} 남음</div></div></div>
+    <div class="note">관세청이 매월 11일(1~10일)·21일(1~20일)에 내는 통관 잠정치다. 열흘치는 조업일·선적 일정에 크게 흔들려 한 달 전체로 늘려 잡지 않는다(금액은 그대로, 증감률은 관세청이 낸 전년 같은 기간 대비만 싣는다). '${pm} 월전체 대비 %p' 는 아래 산업통상부 ${pm} 월간 Y/Y 와의 단순 차이라 기간이 다르다 — 방향만 참고. 104품목(HS) 품목별 카드는 이 발표로 바꾸지 않는다.${FL.top3Share ? ` 상위 3개국(중국·미국·베트남) 비중 ${fmt(FL.top3Share, 1)}%.` : ''}</div>
+    <div class="two"><div class="tbl" data-h="fi"></div><div class="tbl" data-h="fc"></div></div>
+    <div class="two" style="margin-top:10px"><div class="tbl" data-h="mi"></div><div class="tbl" data-h="mc"></div></div>`;
+    g.appendChild(fc);
+    const tblAmt = (rows, what) => `<table><thead><tr><th class="tl">${what}</th><th>${esc(FL.period)} $M</th><th>Y/Y %</th><th>총수출 비중 %</th></tr></thead><tbody>${rows.map((r) => `<tr><td class="tl">${esc(r.name)}</td>${tdN(r.amt, 0)}${tdN(r.yoy, 1, true)}${tdN(r.amt != null ? r.amt / FL.export.amt * 100 : null, 1)}</tr>`).join('')}</tbody></table>`;
+    const tblYoy = (rows, what) => `<table><thead><tr><th class="tl">${what}</th><th>Y/Y %</th></tr></thead><tbody>${rows.map((r) => `<tr><td class="tl">${esc(r.name)}</td>${tdN(r.yoy, 1, true)}</tr>`).join('')}</tbody></table>`;
+    $('[data-h="fi"]', fc).innerHTML = tblAmt(FL.items, '수출 품목');
+    $('[data-h="fc"]', fc).innerHTML = tblAmt(FL.countries, '수출 국가');
+    $('[data-h="mi"]', fc).innerHTML = tblYoy(FL.importItems || [], '수입 품목');
+    $('[data-h="mc"]', fc).innerHTML = tblYoy(FL.importCountries || [], '수입 국가');
+    ['fi', 'fc', 'mi', 'mc'].forEach((k) => makeSortable($(`[data-h="${k}"] table`, fc)));
+  }
   // 산업통상부 월간 수출입동향 — 매월 1일 발표, 104품목 워크북(관세청 HS 확정 반영)보다 2주 빠른 월전체 통관 잠정치
   const MO = ((DATA.motie && DATA.motie.months) || [])[0];
   if (MO) {

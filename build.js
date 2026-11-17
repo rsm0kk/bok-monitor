@@ -23,6 +23,8 @@ let yahoo = null;
 try { yahoo = JSON.parse(read('cache/yahoo.json')); } catch { /* 없으면 FRED 값만 */ }
 let motie = null;
 try { motie = JSON.parse(read('data/motie-export.json')); } catch { /* 없으면 수출 탭의 산업통상부 카드만 빠진다 */ }
+let flash = null;
+try { flash = JSON.parse(read('data/customs-flash.json')); } catch { /* 없으면 수출 탭의 관세청 열흘 속보 카드만 빠진다 */ }
 let consensus = null;
 try { consensus = JSON.parse(read('cache/consensus.json')); } catch { /* 없으면 컨센 카드가 안내만 띄운다 */ }
 
@@ -49,7 +51,7 @@ try {
   }).filter((f) => f.file && f.title && f.w >= 150 && f.h >= 90); // 표지·장 제목 같은 장식 이미지는 뺀다
 } catch { /* 그림 목록 없으면 갤러리만 비운다 */ }
 
-const payload = { ...data, ecos, fred, yahoo, consensus, motie, figures, builtAt: new Date().toISOString().slice(0, 16).replace('T', ' ') };
+const payload = { ...data, ecos, fred, yahoo, consensus, motie, flash, figures, builtAt: new Date().toISOString().slice(0, 16).replace('T', ' ') };
 const safe = (s) => s.replace(/<\//g, '<\\/'); // </script> 가 데이터 안에 들어가면 문서가 깨진다
 
 for (const ph of ['__DATA__', '__NOTES__']) {
